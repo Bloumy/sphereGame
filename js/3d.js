@@ -14,10 +14,33 @@ var Background = function (scene, backgroundColor, starNumber) {
     var starModele = new THREE.Mesh(geometryStar);
 
     this.initStars(starModele);
-
+    this.addBigStars(starModele);
 
     this.scene.background = new THREE.Color(this.backgroundColor);
 
+};
+
+Background.prototype.addBigStars = function (star) {
+
+    this.bigStar = star.clone();
+
+    var randomColor = '#';
+    var color = Math.floor(Math.random() * 16777215).toString(16);
+    for (var u = 0; u < (6 - color.length); u++) {
+        randomColor += '0';
+    }
+    randomColor += color;
+    this.bigStar.material = new THREE.MeshBasicMaterial({color: randomColor, wireframe: true});
+    ;
+
+
+    this.initBigStarPosition(this.bigStar);
+
+    var scale = Math.random() * 400;
+    this.bigStar.scale.set(scale, scale, scale);
+    this.bigStar.initialScale = scale;
+
+    this.scene.add(this.bigStar);
 };
 
 Background.prototype.initStars = function (star) {
@@ -51,6 +74,12 @@ Background.prototype.initStars = function (star) {
 
 };
 
+Background.prototype.initBigStarPosition = function (star) {
+    star.position.x = Math.floor((Math.random() * 6400) + 1) - 3200;
+    star.position.y = Math.floor((Math.random() * 8800) + 1) - 400;
+    star.position.z = Math.floor((Math.random() * 1000) + 1) - 10;
+};
+
 Background.prototype.initStarPosition = function (star) {
     star.position.x = Math.floor((Math.random() * 6400) + 1) - 3200;
     star.position.y = Math.floor((Math.random() * 8800) + 1) - 400;
@@ -66,6 +95,11 @@ Background.prototype.animate = function () {
         this.animateStarBreath(this.stars[key]);
         this.animateStarSlide(this.stars[key]);
     }
+
+    this.bigStar.rotation.x -= 0.01;
+    this.bigStar.rotation.y -= 0.01;
+    this.bigStar.rotation.z += 0.01;
+    this.animateBigStarSlide();
 
 };
 
@@ -92,6 +126,15 @@ Background.prototype.animateStarBreath = function (star) {
         star.scale.set(star.scale.x - 0.01, star.scale.y - 0.01, star.scale.z - 0.01);
     }
 
+};
+
+Background.prototype.animateBigStarSlide = function () {
+    this.bigStar.position.y -= 10;
+
+
+    if (this.bigStar.position.y < -1400) {
+        this.bigStar.position.y = 14000;
+    }
 };
 
 Background.prototype.animateStarSlide = function (star) {
@@ -159,7 +202,7 @@ Level.prototype.update = function () {
 
     this.barLevel.levelXPBar.geometry.verticesNeedUpdate = true;
 
-    
+
 
 };
 
@@ -941,26 +984,30 @@ SphereGame.prototype.init = function () {
 
     this.ennemies = [];
 
-    this.ennemiNumber = 10;
+    this.ennemiNumber = 100;
 
     for (var i = 0; i < this.ennemiNumber; i++) {
-        // initialisation ennemi
-        var popPosition = {
-            x: ((Math.random() * 6400) + 1) - 3200,
-            y: 8600,
-            z: 0
-        };
-        var deplacements = {
-            0: 'down',
-            2000: listOfMove[Math.floor(((Math.random() * 4) + 1) - 1)],
-            4000: listOfMove[Math.floor(((Math.random() * 4) + 1) - 1)],
-            6000: listOfMove[Math.floor(((Math.random() * 4) + 1) - 1)],
-            8000: listOfMove[Math.floor(((Math.random() * 4) + 1) - 1)],
-            10000: 'down'
-        };
+        var self = this;
+        setTimeout(function () {
+            // initialisation ennemi
+            var popPosition = {
+                x: ((Math.random() * 6400) + 1) - 3200,
+                y: 8600,
+                z: 0
+            };
+            var deplacements = {
+                0: 'down',
+                2000: listOfMove[Math.floor(((Math.random() * 4) + 1) - 1)],
+                4000: listOfMove[Math.floor(((Math.random() * 4) + 1) - 1)],
+                6000: listOfMove[Math.floor(((Math.random() * 4) + 1) - 1)],
+                8000: listOfMove[Math.floor(((Math.random() * 4) + 1) - 1)],
+                10000: 'down'
+            };
 
-        var geometry = new THREE.SphereGeometry(Math.floor((Math.random() * 300) + 100), 32, 32);
-        this.ennemies.push(new Ennemi(this.scene, new THREE.Mesh(geometry, material), popPosition, deplacements));
+            var geometry = new THREE.SphereGeometry(Math.floor((Math.random() * 300) + 100), 32, 32);
+
+            self.ennemies.push(new Ennemi(self.scene, new THREE.Mesh(geometry, material), popPosition, deplacements));
+        }, 1000 * i);
     }
     // fin initialisation ennemi
 };
