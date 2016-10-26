@@ -434,26 +434,25 @@ LifeBar.prototype.updatePosition = function () {
 
 };
 
-var Ship = function (scene, mesh, munition) {
+var Ship = function (scene, mesh, munition, levelPosition) {
     this.mesh = mesh;
     this.scene = scene;
     this.scene.add(this.mesh);
-
-    this.scene.ship = this;
+    
     this.scene.ships.push(this);
+    
     this.position = this.mesh.position;
 
     this.lastMunitionCreated = null;
     this.scale = 1;
     this.munitions = [];
-    this.level = new Level(this, 'right');
-
-
+    this.level = new Level(this, levelPosition);
 
     this.atkRange = 10000; //px ?
-    this.atkSpeed = 100; //ms
+    this.atkSpeed = 200; //ms
 
     this.munition = munition;
+    this.munitionDamage = this.level.level;
 
     this.deplacements = {'up': false, 'down': false, 'left': false, 'right': false};
     this.shooting = false;
@@ -465,14 +464,16 @@ var Ship = function (scene, mesh, munition) {
 
 
 
+Ship.prototype.destroyMunition = function (keyToRemove) {
+    this.scene.remove(this.munitions[keyToRemove]);
+    this.munitions.splice(keyToRemove, 1);
+};
+
 Ship.prototype.addExp = function (exp) {
 
     for (var i = 1; i <= exp; i++) {
         if ((this.level.currentXp + 1) > this.level.totalXpForNextLevel) {
-            this.level.level += 1;
-            this.level.textLevel.update();
-            this.level.currentXp = 0;
-            this.level.totalXpForNextLevel = this.level.level * 10;
+            this.levelUp();
         } else {
             this.level.currentXp += 1;
         }
@@ -571,21 +572,19 @@ Ship.prototype.animateMunition = function () {
 
 
         if (munition.position.y - this.getPosition().y > this.atkRange) {
-            this.munitions.splice(key, 1);
-            this.scene.remove(munition);
+            this.destroyMunition(key);
         }
 
         for (var i in this.scene.ennemies) {
             var ennemi = this.scene.ennemies[i];
             // si l'ennemi est aux meme coordonnées que ma munition
             if (ennemi.isAtSamePositionThan(munition.position)) {
-                this.scene.remove(munition);
-                this.munitions.splice(key, 1);
 
+                this.destroyMunition(key);
 
-                ennemi.hp -= 1;
+                ennemi.hp -= this.munitionDamage;
 
-                if (ennemi.hp < 1) {
+                if (ennemi.hp < this.munitionDamage) {
                     ennemi.destroy(this);
                 }
             }
@@ -706,9 +705,12 @@ Ship.prototype.setPosition = function (x, y, z) {
 };
 
 Ship.prototype.levelUp = function () {
-    this.level++;
-    this.atkSpeed -= 20;
-//    this.atkRange += 100;
+    this.level.level += 1;
+    this.level.textLevel.update();
+    this.level.currentXp = 0;
+    this.level.totalXpForNextLevel = this.level.level * 10;
+    this.munitionDamage = this.level.level;
+    this.atkSpeed -= 10;
 };
 
 
@@ -757,6 +759,8 @@ Ship.prototype.launchMunition = function () {
 
     this.scene.add(munition);
     this.munitions.push(munition);
+
+
 
     this.lastMunitionCreated = +new Date();
     return munition;
@@ -877,7 +881,7 @@ Ennemi.prototype.isAtSamePositionThan = function (position) {
 Ennemi.prototype.destroy = function (ship) {
 
     if (ship) {
-        this.scene.ship.addExp(this.gainExpAtDestruction);
+        ship.addExp(this.gainExpAtDestruction);
     }
     this.scene.remove(this.mesh);
     this.lifeBar.destroy();
@@ -913,7 +917,10 @@ var SphereGame = function () {
         requestAnimationFrame(self.animate);
 
         self.background.animate();
-        self.ship.shipBreath();
+        
+        for(var key in self.scene.ships){
+            self.scene.ships[key].shipBreath();
+        }
 
 
 
@@ -952,7 +959,7 @@ SphereGame.prototype.init = function () {
     // on initialise la scène
     this.scene = new THREE.Scene();
     this.scene.ennemies = [];
-    this.scene.ships = [];
+    
 
     // on initialise la camera que l’on place ensuite sur la scène
     this.camera = new THREE.PerspectiveCamera(50, 600 / 800, 1, 50000);
@@ -965,16 +972,17 @@ SphereGame.prototype.init = function () {
 
     // on créé une sphere à laquelle on définie un matériau puis on l’ajoute à la scène 
     // on créé la sphère et on lui applique une texture sous forme d’image
-    var geometry = new THREE.SphereGeometry(200, 32, 32);
-    var material = new THREE.MeshBasicMaterial({map: THREE.ImageUtils.loadTexture(this.srcMainSphereMaterial), overdraw: true});
+    this.geometryShip = new THREE.SphereGeometry(200, 32, 32);
+    this.materialShip = new THREE.MeshBasicMaterial({map: THREE.ImageUtils.loadTexture(this.srcMainSphereMaterial), overdraw: true});
 
     var geometryMunition = new THREE.SphereGeometry(100, 32, 32);
     var materialMunition = new THREE.MeshBasicMaterial({map: THREE.ImageUtils.loadTexture(this.srcMunitionMaterial), overdraw: true});
-    var munition = new THREE.Mesh(geometryMunition, materialMunition);
+    this.munitionShip = new THREE.Mesh(geometryMunition, materialMunition);
 
-    this.ship = new Ship(this.scene, new THREE.Mesh(geometry, material), munition);
-    this.ships = [];
-    this.ships.push(this.ship);
+
+    this.scene.ships = [];
+    this.ship = new Ship(this.scene, new THREE.Mesh(this.geometryShip, this.materialShip), this.munitionShip, 'left');
+    this.playersNumbers = 1;
 
 
     // on ajoute une lumière blanche
@@ -996,9 +1004,8 @@ SphereGame.prototype.init = function () {
 
     this.ennemiNumber = 100;
 
-
+    var self = this;
     for (var i = 0; i < this.ennemiNumber; i++) {
-        var self = this;
         setTimeout(function () {
             // initialisation ennemi
             var popPosition = {
@@ -1058,7 +1065,7 @@ SphereGame.prototype.addKeyboardManager = function () {
 
     document.onkeyup = function (key) {
         switch (key.keyCode) {
-            case  32:
+            case  96:
                 self.ship.shooting = false;
                 break;
             case  37:
@@ -1073,12 +1080,29 @@ SphereGame.prototype.addKeyboardManager = function () {
             case  40:
                 self.ship.deplacements.down = false;
                 break;
+
+            case  32:
+                self.ship2.shooting = false;
+                break;
+            case  81:
+                self.ship2.deplacements.left = false;
+                break;
+            case  90:
+                self.ship2.deplacements.up = false;
+                break;
+            case  68:
+                self.ship2.deplacements.right = false;
+                break;
+            case  83:
+                self.ship2.deplacements.down = false;
+                break;
+
         }
     };
 
     document.onkeydown = function (key) {
         switch (key.keyCode) {
-            case  32:
+            case 96:
                 self.ship.shooting = true;
                 break;
             case  37:
@@ -1092,6 +1116,26 @@ SphereGame.prototype.addKeyboardManager = function () {
                 break;
             case  40:
                 self.ship.deplacements.down = true;
+                break;
+
+            case  32:
+                if (self.scene.ships.length < 2) {
+                    self.ship2 = new Ship(self.scene, new THREE.Mesh(self.geometryShip, self.materialShip), self.munitionShip, 'right');
+                } else {
+                    self.ship2.shooting = true;
+                }
+                break;
+            case  81:
+                self.ship2.deplacements.left = true;
+                break;
+            case  90:
+                self.ship2.deplacements.up = true;
+                break;
+            case  68:
+                self.ship2.deplacements.right = true;
+                break;
+            case  83:
+                self.ship2.deplacements.down = true;
                 break;
         }
     };
