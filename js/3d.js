@@ -438,9 +438,9 @@ var Ship = function (scene, mesh, munition, levelPosition) {
     this.mesh = mesh;
     this.scene = scene;
     this.scene.add(this.mesh);
-    
+
     this.scene.ships.push(this);
-    
+
     this.position = this.mesh.position;
 
     this.lastMunitionCreated = null;
@@ -498,6 +498,41 @@ Ship.prototype.animateShoot = function () {
     this.animateMunition();
 };
 
+
+Ship.prototype.animateCamera = function () {
+
+    console.log(this.scene.isAtMinZoom);
+    // plus d'un vaisseau : pas de suivit de camera
+
+
+
+
+
+    if (!this.scene.isAtMinZoom && this.scene.ships.length === 1) {
+        var x = (this.scene.camera.position.x - (this.scene.camera.position.x - this.position.x) / 10);
+        var y = (this.scene.camera.position.y - (this.scene.camera.position.y - this.position.y) / 10);
+
+        this.scene.camera.position.set(
+                x,
+                y,
+                this.scene.camera.position.z
+                );
+    } else {
+
+        var x = (this.scene.camera.position.x - (this.scene.camera.position.x - this.scene.initialCameraPosition.x) / 10);
+        var y = (this.scene.camera.position.y - (this.scene.camera.position.y - this.scene.initialCameraPosition.y) / 10);
+
+        var z = this.scene.camera.position.z;
+        if (this.scene.ships.length !== 1) {
+            z = this.scene.initialCameraPosition.z;
+        }
+        this.scene.camera.position.set(
+                x,
+                y,
+                z
+                );
+    }
+};
 
 Ship.prototype.animateMunition = function () {
 
@@ -653,6 +688,10 @@ Ship.prototype.animateDeplacements = function () {
         case (deplacements.down):
             this.setPosition(position.x, position.y - 100, position.z);
             break;
+    }
+
+    if (deplacements.up || deplacements.right || deplacements.left || deplacements.down) {
+        this.animateCamera()
     }
 };
 
@@ -917,8 +956,8 @@ var SphereGame = function () {
         requestAnimationFrame(self.animate);
 
         self.background.animate();
-        
-        for(var key in self.scene.ships){
+
+        for (var key in self.scene.ships) {
             self.scene.ships[key].shipBreath();
         }
 
@@ -959,12 +998,36 @@ SphereGame.prototype.init = function () {
     // on initialise la scène
     this.scene = new THREE.Scene();
     this.scene.ennemies = [];
-    
+
+
+    this.scene.initialCameraPosition = {x: 0, y: 4000, z: 10000};
+
 
     // on initialise la camera que l’on place ensuite sur la scène
     this.camera = new THREE.PerspectiveCamera(50, 600 / 800, 1, 50000);
-    this.camera.position.set(0, 4000, 10000);
+    this.camera.position.set(this.scene.initialCameraPosition.x, this.scene.initialCameraPosition.y, this.scene.initialCameraPosition.z);
     this.scene.add(this.camera);
+    this.scene.camera = this.camera;
+
+    this.scene.isAtMinZoom = true;
+    this.scene.isAtMaxZoom = false;
+
+    var self = this;
+
+    var mousewheelevt = (/Firefox/i.test(navigator.userAgent)) ? "DOMMouseScroll" : "mousewheel" //FF doesn't recognize mousewheel as of FF3.x
+    if (document.attachEvent) {
+
+        document.attachEvent("on" + mousewheelevt, function (e) {
+            self.cameraZoom(e.detail * 100);
+        });
+
+    } else if (document.addEventListener) {
+
+        document.addEventListener(mousewheelevt, function (e) {
+            self.cameraZoom(e.detail * 100);
+        }, false);
+
+    }
 
     this.initBgm();
 
@@ -1004,7 +1067,7 @@ SphereGame.prototype.init = function () {
 
     this.ennemiNumber = 100;
 
-    var self = this;
+
     for (var i = 0; i < this.ennemiNumber; i++) {
         setTimeout(function () {
             // initialisation ennemi
@@ -1029,6 +1092,40 @@ SphereGame.prototype.init = function () {
     }
 };
 
+
+SphereGame.prototype.cameraZoom = function (value) {
+
+    if (value > 0) {
+        if (this.camera.position.z <= 10000) {
+            this.camera.position.set(
+                    this.camera.position.x,
+                    this.camera.position.y,
+                    value + this.camera.position.z
+                    );
+        }
+
+    } else {
+        if (this.camera.position.z >= 5000) {
+            this.camera.position.set(
+                    this.camera.position.x,
+                    this.camera.position.y,
+                    value + this.camera.position.z
+                    );
+        }
+    }
+
+    if (this.camera.position.z <= 10000) {
+        this.scene.isAtMinZoom = false;
+    } else {
+        this.scene.isAtMinZoom = true;
+    }
+
+    if (this.camera.position.z >= 5000) {
+        this.scene.isAtMaxZoom = false;
+    } else {
+        this.scene.isAtMaxZoom = true;
+    }
+};
 
 SphereGame.prototype.initBgm = function () {
 
