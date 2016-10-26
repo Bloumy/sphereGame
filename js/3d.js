@@ -453,6 +453,7 @@ var Ship = function (scene, mesh, munition, levelPosition) {
 
     this.munition = munition;
     this.munitionDamage = this.level.level;
+    this.lumiereMunition = new THREE.DirectionalLight(0xffffff, 100.0);
 
     this.deplacements = {'up': false, 'down': false, 'left': false, 'right': false};
     this.shooting = false;
@@ -465,6 +466,7 @@ var Ship = function (scene, mesh, munition, levelPosition) {
 
 
 Ship.prototype.destroyMunition = function (keyToRemove) {
+    this.scene.remove(this.munitions[keyToRemove].lumiere);
     this.scene.remove(this.munitions[keyToRemove]);
     this.munitions.splice(keyToRemove, 1);
 };
@@ -540,6 +542,8 @@ Ship.prototype.animateMunition = function () {
 
         var munition = this.munitions[key];
         var deplacements = munition.deplacementOfShipWhenShooting;
+
+        munition.lumiereMunition.position.set(munition.position.x, munition.position.y, munition.position.z);
 
         switch (true) {
             case (deplacements.left && deplacements.right && deplacements.up && deplacements.down):
@@ -794,6 +798,12 @@ Ship.prototype.launchMunition = function () {
     munition.position.y = this.getPosition().y;
     munition.position.z = this.getPosition().z;
 
+
+    munition.lumiereMunition = this.lumiereMunition.clone();
+    this.scene.add(munition.lumiereMunition);
+    munition.lumiereMunition.position.set(munition.position.x, munition.position.y, munition.position.z);
+
+
     munition.deplacementOfShipWhenShooting = JSON.parse(JSON.stringify(this.deplacements));
 
     this.scene.add(munition);
@@ -836,6 +846,10 @@ Ship.prototype.shipBreath = function () {
 
 var Ennemi = function (scene, mesh, popPosition, deplacements) {
     this.mesh = mesh;
+//    console.log(this.mesh);
+//    this.mesh.castShadow = true;
+//    this.mesh.receiveShadow = true;
+
     this.scene = scene;
     this.scene.add(this.mesh);
 
@@ -992,7 +1006,11 @@ SphereGame.prototype.init = function () {
 
     // si WebGL ne fonctionne pas sur votre navigateur vous pouvez utiliser le moteur de rendu Canvas à la place
     // renderer = new THREE.CanvasRenderer();
-    this.renderer.setSize(600, 800);
+    this.size = {
+        width: window.innerWidth,
+        heigth: window.innerHeight
+    };
+    this.renderer.setSize(this.size.width, this.size.heigth);
     this.gameDiv.appendChild(this.renderer.domElement);
 
     // on initialise la scène
@@ -1004,7 +1022,7 @@ SphereGame.prototype.init = function () {
 
 
     // on initialise la camera que l’on place ensuite sur la scène
-    this.camera = new THREE.PerspectiveCamera(50, 600 / 800, 1, 50000);
+    this.camera = new THREE.PerspectiveCamera(50, this.size.width / this.size.heigth, 1, 50000);
     this.camera.position.set(this.scene.initialCameraPosition.x, this.scene.initialCameraPosition.y, this.scene.initialCameraPosition.z);
     this.scene.add(this.camera);
     this.scene.camera = this.camera;
@@ -1018,13 +1036,15 @@ SphereGame.prototype.init = function () {
     if (document.attachEvent) {
 
         document.attachEvent("on" + mousewheelevt, function (e) {
-            self.cameraZoom(e.detail * 100);
+            var delta = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)));
+            self.cameraZoom(delta * 100);
         });
 
     } else if (document.addEventListener) {
 
         document.addEventListener(mousewheelevt, function (e) {
-            self.cameraZoom(e.detail * 100);
+            var delta = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)));
+            self.cameraZoom(delta * 100);
         }, false);
 
     }
@@ -1033,8 +1053,6 @@ SphereGame.prototype.init = function () {
 
     this.background = new Background(this.scene, 'black', 100, this.srcBigStarMaterial);
 
-    // on créé une sphere à laquelle on définie un matériau puis on l’ajoute à la scène 
-    // on créé la sphère et on lui applique une texture sous forme d’image
     this.geometryShip = new THREE.SphereGeometry(200, 32, 32);
     this.materialShip = new THREE.MeshBasicMaterial({map: THREE.ImageUtils.loadTexture(this.srcMainSphereMaterial), overdraw: true});
 
@@ -1094,7 +1112,7 @@ SphereGame.prototype.init = function () {
 
 
 SphereGame.prototype.cameraZoom = function (value) {
-
+    
     if (value > 0) {
         if (this.camera.position.z <= 10000) {
             this.camera.position.set(
@@ -1105,7 +1123,7 @@ SphereGame.prototype.cameraZoom = function (value) {
         }
 
     } else {
-        if (this.camera.position.z >= 5000) {
+        if (this.camera.position.z >= 5000 && this.scene.ships.length === 1) {
             this.camera.position.set(
                     this.camera.position.x,
                     this.camera.position.y,
@@ -1134,7 +1152,7 @@ SphereGame.prototype.initBgm = function () {
 
 
     this.bgm1 = new THREE.Audio(this.listener);
-
+    this.bgm1.setLoop(true);
     this.scene.add(this.bgm1);
 
     var self = this;
@@ -1218,6 +1236,7 @@ SphereGame.prototype.addKeyboardManager = function () {
             case  32:
                 if (self.scene.ships.length < 2) {
                     self.ship2 = new Ship(self.scene, new THREE.Mesh(self.geometryShip, self.materialShip), self.munitionShip, 'right');
+                    
                 } else {
                     self.ship2.shooting = true;
                 }
