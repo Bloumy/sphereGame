@@ -1,12 +1,12 @@
 
-/* global THREE, document, URL_GLOBULE, URL_CERISE */
+/* global THREE, document, URL_SHIP_SPHERE, URL_CERISE */
 
-var Background = function (scene, backgroundColor, starNumber) {
+var Background = function (scene, backgroundColor, starNumber, bigStarSrc) {
     this.scene = scene;
 
     this.backgroundColor = backgroundColor;
     this.starNumber = starNumber;
-
+    this.srcBigStarMaterials = bigStarSrc;
 
     var starSize = 20;
     var geometryStar = new THREE.SphereGeometry(starSize, 16, 16);
@@ -14,34 +14,27 @@ var Background = function (scene, backgroundColor, starNumber) {
     var starModele = new THREE.Mesh(geometryStar);
 
     this.initStars(starModele);
-    this.addBigStars(starModele);
+    this.addBigStars();
 
     this.scene.background = new THREE.Color(this.backgroundColor);
 
 };
 
-Background.prototype.addBigStars = function (star) {
-
-    this.bigStar = star.clone();
-
-    var randomColor = '#';
-    var color = Math.floor(Math.random() * 16777215).toString(16);
-    for (var u = 0; u < (6 - color.length); u++) {
-        randomColor += '0';
+Background.prototype.addBigStars = function () {
+    this.bigStarMaterial = [];
+    for (var key in this.srcBigStarMaterials) {
+        this.bigStarMaterial.push(new THREE.MeshBasicMaterial({map: THREE.ImageUtils.loadTexture(this.srcBigStarMaterials[key]), overdraw: true}));
     }
-    randomColor += color;
-    this.bigStar.material = new THREE.MeshBasicMaterial({color: randomColor, wireframe: true});
-    ;
 
+    var starSize = 10000;
+    var geometryStar = new THREE.SphereGeometry(starSize, 32, 32);
+    this.bigStar = new THREE.Mesh(geometryStar);
 
-    this.initBigStarPosition(this.bigStar);
-
-    var scale = Math.random() * 400;
-    this.bigStar.scale.set(scale, scale, scale);
-    this.bigStar.initialScale = scale;
+    this.initBigStarPosition();
 
     this.scene.add(this.bigStar);
 };
+
 
 Background.prototype.initStars = function (star) {
     this.stars = [];
@@ -71,13 +64,19 @@ Background.prototype.initStars = function (star) {
         this.stars.push(newStar);
     }
 
-
 };
 
-Background.prototype.initBigStarPosition = function (star) {
-    star.position.x = Math.floor((Math.random() * 6400) + 1) - 3200;
-    star.position.y = Math.floor((Math.random() * 8800) + 1) - 400;
-    star.position.z = Math.floor((Math.random() * 1000) + 1) - 10;
+Background.prototype.initBigStarPosition = function () {
+    this.bigStar.speed = Math.floor(((Math.random() * 40) + 1));
+
+    this.bigStar.position.x = Math.floor((Math.random() * 40000) + 1) - 20000;
+    this.bigStar.position.y = 34000;
+    this.bigStar.position.z = -15000;
+
+    this.bigStar.scale.set(Math.floor((Math.random() * 10) + 5) / 10, Math.floor((Math.random() * 10) + 5) / 10, Math.floor((Math.random() * 10) + 5) / 10);
+
+    this.bigStar.material = this.bigStarMaterial[Math.round((Math.random() * (this.bigStarMaterial.length - 1)) + 0)];
+
 };
 
 Background.prototype.initStarPosition = function (star) {
@@ -99,8 +98,8 @@ Background.prototype.animate = function () {
     this.bigStar.rotation.x -= 0.01;
     this.bigStar.rotation.y -= 0.01;
     this.bigStar.rotation.z += 0.01;
-    this.animateBigStarSlide();
 
+    this.animateBigStarSlide();
 };
 
 
@@ -129,16 +128,18 @@ Background.prototype.animateStarBreath = function (star) {
 };
 
 Background.prototype.animateBigStarSlide = function () {
-    this.bigStar.position.y -= 10;
+    this.bigStar.position.y -= this.bigStar.speed;
+    var self = this;
+    if (this.bigStar.position.y < -24000) {
 
-
-    if (this.bigStar.position.y < -1400) {
-        this.bigStar.position.y = 14000;
+        setTimeout(function () {
+            self.initBigStarPosition();
+        }, 4000);
     }
 };
 
 Background.prototype.animateStarSlide = function (star) {
-    star.position.y += 10 * (star.position.z - 1);
+    star.position.y += 10 * star.position.z;
 
     if (star.position.y < -400) {
         star.position.y = 8400;
@@ -585,7 +586,7 @@ Ship.prototype.animateMunition = function () {
                 ennemi.hp -= 1;
 
                 if (ennemi.hp < 1) {
-                    ennemi.destroy();
+                    ennemi.destroy(this);
                 }
             }
 
@@ -810,6 +811,7 @@ var Ennemi = function (scene, mesh, popPosition, deplacements) {
     this.dateFirstMove = +new Date();
     this.maxHp = 6;
     this.hp = 6;
+    this.gainExpAtDestruction = 2;
 
     this.addLifeBar();
 
@@ -872,11 +874,13 @@ Ennemi.prototype.isAtSamePositionThan = function (position) {
             );
 };
 
-Ennemi.prototype.destroy = function () {
+Ennemi.prototype.destroy = function (ship) {
+
+    if (ship) {
+        this.scene.ship.addExp(this.gainExpAtDestruction);
+    }
     this.scene.remove(this.mesh);
     this.lifeBar.destroy();
-
-    this.scene.ship.addExp(2);
 
     for (var key in this.scene.ennemies) {
         if (this.scene.ennemies[key] === this) {
@@ -895,11 +899,12 @@ Ennemi.prototype.destroy = function () {
 var SphereGame = function () {
 
     this.renderer, this.scene, this.camera, this.mainSphere = null;
-    console.log(document.getElementById('3d'));
     this.gameDiv = document.getElementById('3d');
 
-    this.srcMainSphereMaterial = URL_GLOBULE;
-    this.srcMunitionMaterial = URL_CERISE;
+    this.srcMainSphereMaterial = URL_SHIP_SPHERE;
+    this.srcMunitionMaterial = URL_MUNITION;
+    this.srcEnnemiesMaterial = URLS_ENNEMIES;
+    this.srcBigStarMaterial = {0: URL_BIG_STAR, 1: URL_EARTH};
 
     var self = this;
     this.animate = function () {
@@ -950,12 +955,13 @@ SphereGame.prototype.init = function () {
     this.scene.ships = [];
 
     // on initialise la camera que l’on place ensuite sur la scène
-    this.camera = new THREE.PerspectiveCamera(50, 600 / 800, 1, 10000);
+    this.camera = new THREE.PerspectiveCamera(50, 600 / 800, 1, 50000);
     this.camera.position.set(0, 4000, 10000);
     this.scene.add(this.camera);
 
+    this.initBgm();
 
-    this.background = new Background(this.scene, 'black', 100);
+    this.background = new Background(this.scene, 'black', 100, this.srcBigStarMaterial);
 
     // on créé une sphere à laquelle on définie un matériau puis on l’ajoute à la scène 
     // on créé la sphère et on lui applique une texture sous forme d’image
@@ -978,13 +984,18 @@ SphereGame.prototype.init = function () {
 
 
 
+    //ennemis
+    this.ennemiesMaterials = [];
+    for (var key in this.srcEnnemiesMaterial) {
+        this.ennemiesMaterials.push(new THREE.MeshBasicMaterial({map: THREE.ImageUtils.loadTexture(this.srcEnnemiesMaterial[key]), overdraw: true}));
+    }
+
     var listOfMove = {0: 'down', 1: 'right', 2: 'up', 3: 'left'};
-
-
 
     this.ennemies = [];
 
     this.ennemiNumber = 100;
+
 
     for (var i = 0; i < this.ennemiNumber; i++) {
         var self = this;
@@ -1006,12 +1017,38 @@ SphereGame.prototype.init = function () {
 
             var geometry = new THREE.SphereGeometry(Math.floor((Math.random() * 300) + 100), 32, 32);
 
-            self.ennemies.push(new Ennemi(self.scene, new THREE.Mesh(geometry, material), popPosition, deplacements));
+            self.ennemies.push(new Ennemi(self.scene, new THREE.Mesh(geometry, self.ennemiesMaterials[Math.round((Math.random() * (self.ennemiesMaterials.length - 1)) + 0)]), popPosition, deplacements));
         }, 1000 * i);
     }
-    // fin initialisation ennemi
 };
 
+
+SphereGame.prototype.initBgm = function () {
+
+    this.listener = new THREE.AudioListener();
+    this.camera.add(this.listener);
+
+
+    this.bgm1 = new THREE.Audio(this.listener);
+
+    this.scene.add(this.bgm1);
+
+    var self = this;
+    this.audioLoader = new THREE.AudioLoader();
+
+
+    this.audioLoader.load(
+            'bgm/bgm1.ogg',
+            function (audioBuffer) {
+                self.bgm1.setBuffer(audioBuffer);
+                self.bgm1.play();
+            },
+            function (xhr) {
+                console.log('bgm1 ' + (xhr.loaded / xhr.total * 100) + '% loaded');
+            }
+    );
+
+};
 
 SphereGame.prototype.addKeyboardManager = function () {
 
