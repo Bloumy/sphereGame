@@ -686,7 +686,7 @@ Ship.prototype.animateDeplacements = function () {
             break;
     }
 
-    if (deplacements.up || deplacements.right || deplacements.left || deplacements.down) {
+    if (deplacements.up || deplacements.right || deplacements.left || deplacements.down || (!this.scene.followShip && this.position.z < 10000 )) {
         this.animateCamera();
     }
 };
@@ -746,7 +746,7 @@ Ship.prototype.levelUp = function () {
     this.level.totalXpForNextLevel = this.level.level * 10;
     this.munitionDamage = this.level.level;
     this.atkSpeed -= 10;
-    this.munitionSpeed += this.munitionSpeed/10;
+    this.munitionSpeed += this.munitionSpeed / 10;
 };
 
 
@@ -949,6 +949,7 @@ var SphereGame = function () {
     this.srcMunitionMaterial = URL_MUNITION;
     this.srcEnnemiesMaterial = URLS_ENNEMIES;
     this.srcBigStarMaterial = {0: URL_BIG_STAR, 1: URL_EARTH};
+    this.pause = false;
 
     var self = this;
     this.animate = function () {
@@ -956,20 +957,22 @@ var SphereGame = function () {
         // on appel la fonction animate() récursivement à chaque frame
         requestAnimationFrame(self.animate);
 
+        if (self.pause) {
+            return;
+        }
+
         self.background.animate();
 
         for (var key in self.scene.ships) {
             self.scene.ships[key].shipBreath();
         }
 
-
-
         for (var i in self.scene.ships) {
             self.scene.ships[i].animate();
         }
+
         for (var i in self.scene.ennemies) {
             self.scene.ennemies[i].animate();
-
         }
 
         // on fait tourner le cube sur ses axes x et y
@@ -983,8 +986,8 @@ var SphereGame = function () {
 
     this.init();
     this.addKeyboardManager();
-    this.animate();
 
+    this.animate();
 };
 
 SphereGame.prototype.init = function () {
@@ -1023,6 +1026,9 @@ SphereGame.prototype.init = function () {
     if (document.attachEvent) {
 
         document.attachEvent("on" + mousewheelevt, function (e) {
+            if (self.pause) {
+                return;
+            }
             var delta = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)));
             self.cameraZoom(delta * -100);
         });
@@ -1030,6 +1036,9 @@ SphereGame.prototype.init = function () {
     } else if (document.addEventListener) {
 
         document.addEventListener(mousewheelevt, function (e) {
+            if (self.pause) {
+                return;
+            }
             var delta = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)));
             self.cameraZoom(delta * -100);
         }, false);
@@ -1132,6 +1141,11 @@ SphereGame.prototype.cameraZoom = function (value) {
     this.ship.animateCamera();
 };
 
+SphereGame.prototype.tooglePause = function () {
+    this.pause = !this.pause;
+    console.log(this.pause);
+};
+
 SphereGame.prototype.initBgm = function () {
 
     this.listener = new THREE.AudioListener();
@@ -1164,6 +1178,9 @@ SphereGame.prototype.addKeyboardManager = function () {
 
     document.onkeyup = function (key) {
         switch (key.keyCode) {
+            case  27:
+                self.tooglePause();
+                break;
             case  32:
                 self.ship.shooting = false;
                 break;
