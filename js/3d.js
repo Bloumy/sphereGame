@@ -453,7 +453,7 @@ var Ship = function (scene, mesh, munition, levelPosition) {
 
     this.munition = munition;
     this.munitionDamage = this.level.level;
-    this.lumiereMunition = new THREE.DirectionalLight(0xffffff, 100.0);
+//    this.lumiereMunition = new THREE.DirectionalLight(0xffffff, 100.0);
 
     this.deplacements = {'up': false, 'down': false, 'left': false, 'right': false};
     this.shooting = false;
@@ -500,39 +500,33 @@ Ship.prototype.animateShoot = function () {
     this.animateMunition();
 };
 
+Ship.prototype.cameraFollowShip = function () {
+    var x = (this.scene.camera.position.x - (this.scene.camera.position.x - this.position.x) / 10);
+    var y = (this.scene.camera.position.y - (this.scene.camera.position.y - this.position.y) / 10);
+
+    this.scene.camera.position.set(x, y, this.scene.camera.position.z);
+
+};
+
+Ship.prototype.cameraFixed = function () {
+
+    var x = (this.scene.camera.position.x - (this.scene.camera.position.x - this.scene.initialCameraPosition.x) / 10);
+    var y = (this.scene.camera.position.y - (this.scene.camera.position.y - this.scene.initialCameraPosition.y) / 10);
+
+    var z = this.scene.camera.position.z;
+    if (this.scene.ships.length !== 1) {
+        z = this.scene.initialCameraPosition.z;
+    }
+    this.scene.camera.position.set(x, y, z);
+};
+
 
 Ship.prototype.animateCamera = function () {
 
-    console.log(this.scene.isAtMinZoom);
-    // plus d'un vaisseau : pas de suivit de camera
-
-
-
-
-
-    if (!this.scene.isAtMinZoom && this.scene.ships.length === 1) {
-        var x = (this.scene.camera.position.x - (this.scene.camera.position.x - this.position.x) / 10);
-        var y = (this.scene.camera.position.y - (this.scene.camera.position.y - this.position.y) / 10);
-
-        this.scene.camera.position.set(
-                x,
-                y,
-                this.scene.camera.position.z
-                );
+    if (!this.scene.followShip) {
+        this.cameraFixed();
     } else {
-
-        var x = (this.scene.camera.position.x - (this.scene.camera.position.x - this.scene.initialCameraPosition.x) / 10);
-        var y = (this.scene.camera.position.y - (this.scene.camera.position.y - this.scene.initialCameraPosition.y) / 10);
-
-        var z = this.scene.camera.position.z;
-        if (this.scene.ships.length !== 1) {
-            z = this.scene.initialCameraPosition.z;
-        }
-        this.scene.camera.position.set(
-                x,
-                y,
-                z
-                );
+        this.cameraFollowShip();
     }
 };
 
@@ -542,8 +536,6 @@ Ship.prototype.animateMunition = function () {
 
         var munition = this.munitions[key];
         var deplacements = munition.deplacementOfShipWhenShooting;
-
-        munition.lumiereMunition.position.set(munition.position.x, munition.position.y, munition.position.z);
 
         switch (true) {
             case (deplacements.left && deplacements.right && deplacements.up && deplacements.down):
@@ -695,7 +687,7 @@ Ship.prototype.animateDeplacements = function () {
     }
 
     if (deplacements.up || deplacements.right || deplacements.left || deplacements.down) {
-        this.animateCamera()
+        this.animateCamera();
     }
 };
 
@@ -754,6 +746,7 @@ Ship.prototype.levelUp = function () {
     this.level.totalXpForNextLevel = this.level.level * 10;
     this.munitionDamage = this.level.level;
     this.atkSpeed -= 10;
+    this.munitionSpeed += this.munitionSpeed/10;
 };
 
 
@@ -797,12 +790,6 @@ Ship.prototype.launchMunition = function () {
     munition.position.x = this.getPosition().x;
     munition.position.y = this.getPosition().y;
     munition.position.z = this.getPosition().z;
-
-
-    munition.lumiereMunition = this.lumiereMunition.clone();
-    this.scene.add(munition.lumiereMunition);
-    munition.lumiereMunition.position.set(munition.position.x, munition.position.y, munition.position.z);
-
 
     munition.deplacementOfShipWhenShooting = JSON.parse(JSON.stringify(this.deplacements));
 
@@ -1027,8 +1014,8 @@ SphereGame.prototype.init = function () {
     this.scene.add(this.camera);
     this.scene.camera = this.camera;
 
-    this.scene.isAtMinZoom = true;
-    this.scene.isAtMaxZoom = false;
+
+    this.scene.followShip = false;
 
     var self = this;
 
@@ -1037,14 +1024,14 @@ SphereGame.prototype.init = function () {
 
         document.attachEvent("on" + mousewheelevt, function (e) {
             var delta = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)));
-            self.cameraZoom(delta * 100);
+            self.cameraZoom(delta * -100);
         });
 
     } else if (document.addEventListener) {
 
         document.addEventListener(mousewheelevt, function (e) {
             var delta = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)));
-            self.cameraZoom(delta * 100);
+            self.cameraZoom(delta * -100);
         }, false);
 
     }
@@ -1060,10 +1047,11 @@ SphereGame.prototype.init = function () {
     var materialMunition = new THREE.MeshBasicMaterial({map: THREE.ImageUtils.loadTexture(this.srcMunitionMaterial), overdraw: true});
     this.munitionShip = new THREE.Mesh(geometryMunition, materialMunition);
 
-
+    this.allowSecondPlayer = false;
     this.scene.ships = [];
     this.ship = new Ship(this.scene, new THREE.Mesh(this.geometryShip, this.materialShip), this.munitionShip, 'left');
     this.playersNumbers = 1;
+
 
 
     // on ajoute une lumière blanche
@@ -1112,37 +1100,36 @@ SphereGame.prototype.init = function () {
 
 
 SphereGame.prototype.cameraZoom = function (value) {
-    
+
+    if (this.camera.position.z < 10000 && !this.ship2) {
+        this.scene.followShip = true;
+    } else {
+        this.scene.followShip = false;
+    }
+
+
     if (value > 0) {
         if (this.camera.position.z <= 10000) {
-            this.camera.position.set(
-                    this.camera.position.x,
-                    this.camera.position.y,
-                    value + this.camera.position.z
-                    );
+            if (value + this.camera.position.z > 10000) {
+                this.camera.position.z = 10000;
+            } else {
+                this.camera.position.z = value + this.camera.position.z;
+            }
+
         }
 
     } else {
-        if (this.camera.position.z >= 5000 && this.scene.ships.length === 1) {
-            this.camera.position.set(
-                    this.camera.position.x,
-                    this.camera.position.y,
-                    value + this.camera.position.z
-                    );
+        if (this.camera.position.z >= 5000) {
+
+            if (value + this.camera.position.z < 5000) {
+                this.camera.position.z = 5000;
+            } else {
+                this.camera.position.z = value + this.camera.position.z;
+            }
         }
     }
 
-    if (this.camera.position.z <= 10000) {
-        this.scene.isAtMinZoom = false;
-    } else {
-        this.scene.isAtMinZoom = true;
-    }
-
-    if (this.camera.position.z >= 5000) {
-        this.scene.isAtMaxZoom = false;
-    } else {
-        this.scene.isAtMaxZoom = true;
-    }
+    this.ship.animateCamera();
 };
 
 SphereGame.prototype.initBgm = function () {
@@ -1173,14 +1160,11 @@ SphereGame.prototype.initBgm = function () {
 };
 
 SphereGame.prototype.addKeyboardManager = function () {
-
-
     var self = this;
-
 
     document.onkeyup = function (key) {
         switch (key.keyCode) {
-            case  96:
+            case  32:
                 self.ship.shooting = false;
                 break;
             case  37:
@@ -1196,20 +1180,30 @@ SphereGame.prototype.addKeyboardManager = function () {
                 self.ship.deplacements.down = false;
                 break;
 
-            case  32:
-                self.ship2.shooting = false;
+            case  17:
+                if (self.scene.ship2) {
+                    self.ship2.shooting = false;
+                 }
                 break;
             case  81:
-                self.ship2.deplacements.left = false;
+                if (self.scene.ship2) {
+                    self.ship2.deplacements.left = false;
+                }
                 break;
             case  90:
-                self.ship2.deplacements.up = false;
+                if (self.scene.ship2) {
+                    self.ship2.deplacements.up = false;
+                }
                 break;
             case  68:
-                self.ship2.deplacements.right = false;
+                if (self.scene.ship2) {
+                    self.ship2.deplacements.right = false;
+                }
                 break;
             case  83:
-                self.ship2.deplacements.down = false;
+                if (self.scene.ship2) {
+                    self.ship2.deplacements.down = false;
+                }
                 break;
 
         }
@@ -1217,7 +1211,7 @@ SphereGame.prototype.addKeyboardManager = function () {
 
     document.onkeydown = function (key) {
         switch (key.keyCode) {
-            case 96:
+            case 32:
                 self.ship.shooting = true;
                 break;
             case  37:
@@ -1233,25 +1227,35 @@ SphereGame.prototype.addKeyboardManager = function () {
                 self.ship.deplacements.down = true;
                 break;
 
-            case  32:
-                if (self.scene.ships.length < 2) {
-                    self.ship2 = new Ship(self.scene, new THREE.Mesh(self.geometryShip, self.materialShip), self.munitionShip, 'right');
-                    
-                } else {
-                    self.ship2.shooting = true;
+            case  17:
+                if (self.allowSecondPlayer) {
+                    if (!self.scene.ship2) {
+                        self.ship2 = new Ship(self.scene, new THREE.Mesh(self.geometryShip, self.materialShip), self.munitionShip, 'right');
+
+                    } else {
+                        self.ship2.shooting = true;
+                    }
                 }
                 break;
             case  81:
-                self.ship2.deplacements.left = true;
+                if (self.scene.ship2) {
+                    self.ship2.deplacements.left = true;
+                }
                 break;
             case  90:
-                self.ship2.deplacements.up = true;
+                if (self.scene.ship2) {
+                    self.ship2.deplacements.up = true;
+                }
                 break;
             case  68:
-                self.ship2.deplacements.right = true;
+                if (self.scene.ship2) {
+                    self.ship2.deplacements.right = true;
+                }
                 break;
             case  83:
-                self.ship2.deplacements.down = true;
+                if (self.scene.ship2) {
+                    self.ship2.deplacements.down = true;
+                }
                 break;
         }
     };
