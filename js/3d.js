@@ -1,12 +1,12 @@
 
 /* global THREE, document, URL_SHIP_SPHERE, URL_CERISE */
 
-var Background = function (scene, backgroundColor, starNumber, bigStarSrc) {
+var Background = function (scene, backgroundColor, starNumber, bigStarsSrc) {
     this.scene = scene;
 
     this.backgroundColor = backgroundColor;
     this.starNumber = starNumber;
-    this.srcBigStarMaterials = bigStarSrc;
+    this.srcBigStarMaterials = bigStarsSrc;
 
     var starSize = 20;
     var geometryStar = new THREE.SphereGeometry(starSize, 16, 16);
@@ -21,11 +21,30 @@ var Background = function (scene, backgroundColor, starNumber, bigStarSrc) {
 };
 
 Background.prototype.addBigStars = function () {
+    var self = this;
     this.bigStarMaterial = [];
-    for (var key in this.srcBigStarMaterials) {
-        this.bigStarMaterial.push(new THREE.MeshBasicMaterial({map: THREE.ImageUtils.loadTexture(this.srcBigStarMaterials[key]), overdraw: true}));
+    var textureLoader = new THREE.TextureLoader();
+    for (var i = 0; i < this.srcBigStarMaterials.length; i++) {
+        textureLoader.load(
+                this.srcBigStarMaterials[i],
+                function (texture) {
+                    texture.minFilter = THREE.LinearFilter;
+                    self.bigStarMaterial.push(new THREE.MeshBasicMaterial({map: texture}));
+
+                    if (self.srcBigStarMaterials.length === self.bigStarMaterial.length) {
+                        self.createBigStar();
+                    }
+                },
+                function (xhr) {
+                    console.log(xhr.target.responseURL + ' ' + (xhr.loaded / xhr.total * 100) + '% loaded');
+                }
+        );
     }
 
+};
+
+
+Background.prototype.createBigStar = function () {
     var starSize = 10000;
     var geometryStar = new THREE.SphereGeometry(starSize, 32, 32);
     this.bigStar = new THREE.Mesh(geometryStar);
@@ -34,7 +53,6 @@ Background.prototype.addBigStars = function () {
 
     this.scene.add(this.bigStar);
 };
-
 
 Background.prototype.initStars = function (star) {
     this.stars = [];
@@ -94,12 +112,14 @@ Background.prototype.animate = function () {
         this.animateStarBreath(this.stars[key]);
         this.animateStarSlide(this.stars[key]);
     }
+    if (this.bigStar) {
+        this.bigStar.rotation.x -= 0.01;
+        this.bigStar.rotation.y -= 0.01;
+        this.bigStar.rotation.z += 0.01;
+        this.animateBigStarSlide();
+    }
 
-    this.bigStar.rotation.x -= 0.01;
-    this.bigStar.rotation.y -= 0.01;
-    this.bigStar.rotation.z += 0.01;
-
-    this.animateBigStarSlide();
+    
 };
 
 
@@ -248,7 +268,9 @@ BarLevel.prototype.addFontBar = function () {
     rectShapeBase.lineTo(point4.x, point4.y);
     rectShapeBase.lineTo(point1.x, point1.y);
 
-    var geometry = rectShapeBase.makeGeometry();
+
+    var geometry = new THREE.ShapeGeometry(rectShapeBase);
+
     var material = new THREE.LineBasicMaterial({
         color: 0xffffff
     });
@@ -290,7 +312,7 @@ BarLevel.prototype.addXPBar = function () {
     rectShapeBase.lineTo(point4.x, point4.y);
     rectShapeBase.lineTo(point1.x, point1.y);
 
-    var geometry = rectShapeBase.makeGeometry();
+    var geometry = new THREE.ShapeGeometry(rectShapeBase);
     var material = new THREE.LineBasicMaterial({
         color: 'gold'
     });
@@ -386,7 +408,8 @@ var LifeBar = function (itemRattached, maxLife, currentLife) {
     rectShape.lineTo(this.itemRattached.position.x + 220, this.itemRattached.position.y - 420);
     rectShape.lineTo(this.itemRattached.position.x - 220, this.itemRattached.position.y - 420);
 
-    var geometry = rectShape.makeGeometry();
+
+    var geometry = new THREE.ShapeGeometry(rectShape);
     var material = new THREE.MeshBasicMaterial({color: 0x00ffff});
     this.lifeCadre = new THREE.Mesh(geometry, material);
     this.itemRattached.scene.add(this.lifeCadre);
@@ -457,7 +480,8 @@ var Ship = function (scene, mesh, munition, levelPosition) {
 
     this.deplacements = {'up': false, 'down': false, 'left': false, 'right': false};
     this.shooting = false;
-    this.munitionSpeed = 200;
+    this.munitionSpeed = 150;
+    this.munitionSpeedMax = 300;
 
     this.addLifeBar();
 
@@ -497,7 +521,9 @@ Ship.prototype.animateShoot = function () {
     if (this.shooting) {
         this.attack();
     }
-    this.animateMunition();
+    if (this.munitions.length > 0) {
+        this.animateMunition();
+    }
 };
 
 Ship.prototype.cameraFollowShip = function () {
@@ -686,13 +712,14 @@ Ship.prototype.animateDeplacements = function () {
             break;
     }
 
-    if (deplacements.up || deplacements.right || deplacements.left || deplacements.down || (!this.scene.followShip && this.position.z < 10000 )) {
+    if (deplacements.up || deplacements.right || deplacements.left || deplacements.down || (!this.scene.followShip && this.position.z < 10000)) {
         this.animateCamera();
     }
 };
 
 Ship.prototype.animate = function () {
     this.animateRotation();
+    this.shipBreath();
     this.animateShoot();
     this.animateDeplacements();
     this.lifeBar.updatePosition();
@@ -746,7 +773,9 @@ Ship.prototype.levelUp = function () {
     this.level.totalXpForNextLevel = this.level.level * 10;
     this.munitionDamage = this.level.level;
     this.atkSpeed -= 10;
-    this.munitionSpeed += this.munitionSpeed / 10;
+    if (this.munitionSpeed < this.munitionSpeedMax) {
+        this.munitionSpeed += 5;
+    }
 };
 
 
@@ -833,9 +862,7 @@ Ship.prototype.shipBreath = function () {
 
 var Ennemi = function (scene, mesh, popPosition, deplacements) {
     this.mesh = mesh;
-//    console.log(this.mesh);
-//    this.mesh.castShadow = true;
-//    this.mesh.receiveShadow = true;
+
 
     this.scene = scene;
     this.scene.add(this.mesh);
@@ -948,7 +975,7 @@ var SphereGame = function () {
     this.srcMainSphereMaterial = URL_SHIP_SPHERE;
     this.srcMunitionMaterial = URL_MUNITION;
     this.srcEnnemiesMaterial = URLS_ENNEMIES;
-    this.srcBigStarMaterial = {0: URL_BIG_STAR, 1: URL_EARTH};
+    this.bigStarsSrc = URL_BIG_STARS;
     this.pause = false;
 
     var self = this;
@@ -963,9 +990,6 @@ var SphereGame = function () {
 
         self.background.animate();
 
-        for (var key in self.scene.ships) {
-            self.scene.ships[key].shipBreath();
-        }
 
         for (var i in self.scene.ships) {
             self.scene.ships[i].animate();
@@ -975,9 +999,7 @@ var SphereGame = function () {
             self.scene.ennemies[i].animate();
         }
 
-        // on fait tourner le cube sur ses axes x et y
-        self.ship.mesh.rotation.x += 0.01;
-        self.ship.mesh.rotation.y += 0.02;
+
         // on effectue le rendu de la scène
         self.renderer.render(self.scene, self.camera);
     };
@@ -1047,41 +1069,58 @@ SphereGame.prototype.init = function () {
 
     this.initBgm();
 
-    this.background = new Background(this.scene, 'black', 100, this.srcBigStarMaterial);
-
-    this.geometryShip = new THREE.SphereGeometry(200, 32, 32);
-    this.materialShip = new THREE.MeshBasicMaterial({map: THREE.ImageUtils.loadTexture(this.srcMainSphereMaterial), overdraw: true});
-
-    var geometryMunition = new THREE.SphereGeometry(100, 32, 32);
-    var materialMunition = new THREE.MeshBasicMaterial({map: THREE.ImageUtils.loadTexture(this.srcMunitionMaterial), overdraw: true});
-    this.munitionShip = new THREE.Mesh(geometryMunition, materialMunition);
+    this.background = new Background(this.scene, 'black', 100, this.bigStarsSrc);
 
     this.allowSecondPlayer = false;
     this.scene.ships = [];
-    this.ship = new Ship(this.scene, new THREE.Mesh(this.geometryShip, this.materialShip), this.munitionShip, 'left');
-    this.playersNumbers = 1;
+    this.playersNumbers = 0;
 
+    this.textureLoader = new THREE.TextureLoader();
 
+    this.textureLoader.load(
+            this.srcMainSphereMaterial,
+            function (texture) {
+                self.createShip(texture);
+            },
+            function (xhr) {
+                console.log(xhr.target.responseURL + ' ' + (xhr.loaded / xhr.total * 100) + '% loaded');
+            }
+    );
 
     // on ajoute une lumière blanche
     var lumiere = new THREE.DirectionalLight(0xffffff, 1.0);
     lumiere.position.set(0, 0, 400);
     this.scene.add(lumiere);
 
-
-
-    //ennemis
     this.ennemiesMaterials = [];
-    for (var key in this.srcEnnemiesMaterial) {
-        this.ennemiesMaterials.push(new THREE.MeshBasicMaterial({map: THREE.ImageUtils.loadTexture(this.srcEnnemiesMaterial[key]), overdraw: true}));
+
+    for (var i = 0; i < this.srcEnnemiesMaterial.length; i++) {
+        this.textureLoader.load(
+                this.srcEnnemiesMaterial[i],
+                function (texture) {
+                    texture.minFilter = THREE.LinearFilter;
+                    self.ennemiesMaterials.push(new THREE.MeshBasicMaterial({map: texture}));
+
+                    if (self.srcEnnemiesMaterial.length === self.ennemiesMaterials.length) {
+                        self.createEnnemies();
+                    }
+                },
+                function (xhr) {
+                    console.log(xhr.target.responseURL + ' ' + (xhr.loaded / xhr.total * 100) + '% loaded');
+                }
+        );
     }
 
-    var listOfMove = {0: 'down', 1: 'right', 2: 'up', 3: 'left'};
+};
 
-    this.ennemies = [];
+
+
+SphereGame.prototype.createEnnemies = function () {
+    var listOfMove = {0: 'down', 1: 'right', 2: 'up', 3: 'left'};
 
     this.ennemiNumber = 100;
 
+    var self = this;
 
     for (var i = 0; i < this.ennemiNumber; i++) {
         setTimeout(function () {
@@ -1102,11 +1141,48 @@ SphereGame.prototype.init = function () {
 
             var geometry = new THREE.SphereGeometry(Math.floor((Math.random() * 300) + 100), 32, 32);
 
-            self.ennemies.push(new Ennemi(self.scene, new THREE.Mesh(geometry, self.ennemiesMaterials[Math.round((Math.random() * (self.ennemiesMaterials.length - 1)) + 0)]), popPosition, deplacements));
+            new Ennemi(self.scene, new THREE.Mesh(geometry, self.ennemiesMaterials[Math.round(Math.random() * (self.ennemiesMaterials.length - 1)) ]), popPosition, deplacements);
         }, 1000 * i);
     }
 };
 
+SphereGame.prototype.createShip = function (texture) {
+    texture.minFilter = THREE.LinearFilter;
+    this.geometryShip = new THREE.SphereGeometry(200, 32, 32);
+    this.materialShip = new THREE.MeshBasicMaterial({
+        map: texture
+    });
+
+    if (!this.munitionShip) {
+        var self = this;
+        // créer les munitions 
+        this.textureLoader.load(
+                this.srcMunitionMaterial,
+                function (textureMun) {
+
+                    self.createMunitionTexture(textureMun);
+                    console.log(self.munitionShip);
+                    self.ship = new Ship(self.scene, new THREE.Mesh(self.geometryShip, self.materialShip), self.munitionShip, 'left');
+                },
+                function (xhr) {
+                    console.log(xhr.target.responseURL + ' ' + (xhr.loaded / xhr.total * 100) + '% loaded');
+                }
+        );
+    } else {
+        this.ship = new Ship(this.scene, new THREE.Mesh(this.geometryShip, this.materialShip), this.munitionShip, 'left');
+    }
+
+    this.playersNumbers++;
+};
+
+SphereGame.prototype.createMunitionTexture = function (texture) {
+    texture.minFilter = THREE.LinearFilter;
+    var geometryMunition = new THREE.SphereGeometry(100, 32, 32);
+    var materialMunition = new THREE.MeshBasicMaterial({
+        map: texture
+    });
+    this.munitionShip = new THREE.Mesh(geometryMunition, materialMunition);
+};
 
 SphereGame.prototype.cameraZoom = function (value) {
 
@@ -1143,7 +1219,6 @@ SphereGame.prototype.cameraZoom = function (value) {
 
 SphereGame.prototype.tooglePause = function () {
     this.pause = !this.pause;
-    console.log(this.pause);
 };
 
 SphereGame.prototype.initBgm = function () {
@@ -1167,7 +1242,7 @@ SphereGame.prototype.initBgm = function () {
                 self.bgm1.play();
             },
             function (xhr) {
-                console.log('bgm1 ' + (xhr.loaded / xhr.total * 100) + '% loaded');
+                console.log(xhr.target.responseURL + ' '+ (xhr.loaded / xhr.total * 100) + '% loaded');
             }
     );
 
