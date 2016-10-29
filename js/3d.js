@@ -1,5 +1,11 @@
+//THREE.PerspectiveCamera.prototype.rotate = function (angle, radius) {
+//    this.angle = angle;
+//    this.position.x = radius * Math.cos(this.angle);
+//    this.position.z = radius * Math.sin(this.angle);
+//    this.angle += 0.01;
+//};
 
-/* global THREE, document, URL_SHIP_SPHERE, URL_CERISE */
+/* global THREE, document, URL_SHIP_SPHERE, URL_CERISE, URL_FONT,URLS_ENNEMIES, URL_MUNITION */
 
 var Background = function (scene, backgroundColor, starNumber, bigStarsSrc) {
     this.scene = scene;
@@ -119,7 +125,7 @@ Background.prototype.animate = function () {
         this.animateBigStarSlide();
     }
 
-    
+
 };
 
 
@@ -161,8 +167,8 @@ Background.prototype.animateBigStarSlide = function () {
 Background.prototype.animateStarSlide = function (star) {
     star.position.y += 10 * star.position.z;
 
-    if (star.position.y < -400) {
-        star.position.y = 8400;
+    if (star.position.y < -10000) {
+        star.position.y = 20000;
     }
 };
 
@@ -476,7 +482,6 @@ var Ship = function (scene, mesh, munition, levelPosition) {
 
     this.munition = munition;
     this.munitionDamage = this.level.level;
-//    this.lumiereMunition = new THREE.DirectionalLight(0xffffff, 100.0);
 
     this.deplacements = {'up': false, 'down': false, 'left': false, 'right': false};
     this.shooting = false;
@@ -484,13 +489,14 @@ var Ship = function (scene, mesh, munition, levelPosition) {
     this.munitionSpeedMax = 300;
 
     this.addLifeBar();
-
+    var event = new Event('shipcreated', [this]);
+    document.dispatchEvent(event);
 };
 
 
 
 Ship.prototype.destroyMunition = function (keyToRemove) {
-    this.scene.remove(this.munitions[keyToRemove].lumiere);
+
     this.scene.remove(this.munitions[keyToRemove]);
     this.munitions.splice(keyToRemove, 1);
 };
@@ -527,8 +533,16 @@ Ship.prototype.animateShoot = function () {
 };
 
 Ship.prototype.cameraFollowShip = function () {
+
     var x = (this.scene.camera.position.x - (this.scene.camera.position.x - this.position.x) / 10);
+    if (Math.round(this.scene.camera.position.x) - Math.round(this.position.x) === 0) {
+        x = this.position.x;
+    }
+
     var y = (this.scene.camera.position.y - (this.scene.camera.position.y - this.position.y) / 10);
+    if (Math.round(this.scene.camera.position.y) - Math.round(this.position.y) === 0) {
+        y = this.position.y;
+    }
 
     this.scene.camera.position.set(x, y, this.scene.camera.position.z);
 
@@ -537,13 +551,28 @@ Ship.prototype.cameraFollowShip = function () {
 Ship.prototype.cameraFixed = function () {
 
     var x = (this.scene.camera.position.x - (this.scene.camera.position.x - this.scene.initialCameraPosition.x) / 10);
+    if (Math.round(this.scene.camera.position.x) - Math.round(this.scene.initialCameraPosition.x) === 0) {
+        x = this.scene.initialCameraPosition.x;
+    }
+
     var y = (this.scene.camera.position.y - (this.scene.camera.position.y - this.scene.initialCameraPosition.y) / 10);
+    if (Math.round(this.scene.camera.position.y) - Math.round(this.scene.initialCameraPosition.y) === 0) {
+        y = this.scene.initialCameraPosition.y;
+    }
 
     var z = this.scene.camera.position.z;
     if (this.scene.ships.length !== 1) {
         z = this.scene.initialCameraPosition.z;
     }
     this.scene.camera.position.set(x, y, z);
+
+    if (this.scene.camera.RotationXSinceInitial !== this.initialRotationX) {
+        var rotation = this.scene.camera.RotationXSinceInitial * (-1);
+        this.scene.camera.rotateX(rotation);
+        this.scene.camera.RotationXSinceInitial += rotation;
+    }
+
+
 };
 
 
@@ -712,7 +741,13 @@ Ship.prototype.animateDeplacements = function () {
             break;
     }
 
-    if (deplacements.up || deplacements.right || deplacements.left || deplacements.down || (!this.scene.followShip && this.position.z < 10000)) {
+
+    var shipIsMoving = deplacements.up || deplacements.right || deplacements.left || deplacements.down;
+
+    var cameraIsFixed = ((this.scene.initialCameraPosition.x === this.scene.camera.position.x) && (this.scene.initialCameraPosition.y === this.scene.camera.position.y) && (this.scene.initialCameraPosition.z === this.scene.camera.position.z));
+    var cameraIsFollowingShip = (this.position.x === this.scene.camera.position.x && this.position.y === this.scene.camera.position.y && this.scene.initialCameraPosition.z !== this.scene.camera.position.z);
+
+    if (shipIsMoving || (!this.scene.followShip && !cameraIsFixed) || (this.scene.followShip && !cameraIsFollowingShip)) {
         this.animateCamera();
     }
 };
@@ -969,7 +1004,7 @@ Ennemi.prototype.destroy = function (ship) {
  */
 var SphereGame = function () {
 
-    this.renderer, this.scene, this.camera, this.mainSphere = null;
+    this.renderer, this.scene, this.mainSphere = null;
     this.gameDiv = document.getElementById('3d');
 
     this.srcMainSphereMaterial = URL_SHIP_SPHERE;
@@ -1001,7 +1036,7 @@ var SphereGame = function () {
 
 
         // on effectue le rendu de la scène
-        self.renderer.render(self.scene, self.camera);
+        self.renderer.render(self.scene, self.scene.camera);
     };
 
 
@@ -1027,6 +1062,7 @@ SphereGame.prototype.init = function () {
 
     // on initialise la scène
     this.scene = new THREE.Scene();
+
     this.scene.ennemies = [];
 
 
@@ -1034,10 +1070,17 @@ SphereGame.prototype.init = function () {
 
 
     // on initialise la camera que l’on place ensuite sur la scène
-    this.camera = new THREE.PerspectiveCamera(50, this.size.width / this.size.heigth, 1, 50000);
-    this.camera.position.set(this.scene.initialCameraPosition.x, this.scene.initialCameraPosition.y, this.scene.initialCameraPosition.z);
-    this.scene.add(this.camera);
-    this.scene.camera = this.camera;
+    this.scene.camera = new THREE.PerspectiveCamera(50, this.size.width / this.size.heigth, 1, 50000);
+    this.scene.camera.position.set(this.scene.initialCameraPosition.x, this.scene.initialCameraPosition.y, this.scene.initialCameraPosition.z);
+    this.scene.add(this.scene.camera);
+
+
+    this.scene.camera.initialRotationX = 0.00;
+    this.scene.camera.RotationXSinceInitial = 0.00;
+    this.scene.camera.initialRotationY = 0.00;
+    this.scene.camera.RotationYSinceInitial = 0.00;
+    this.scene.camera.initialRotationZ = 0.00;
+    this.scene.camera.RotationZSinceInitial = 0.00;
 
 
     this.scene.followShip = false;
@@ -1087,6 +1130,20 @@ SphereGame.prototype.init = function () {
             }
     );
 
+    if (document.attachEvent) {
+
+        document.attachEvent("shipcreated", function (e, er) {
+            console.log(e);
+        });
+
+    } else if (document.addEventListener) {
+
+        document.addEventListener("shipcreated", function (e, er) {
+            console.log(er);
+        }, false);
+
+    }
+
     // on ajoute une lumière blanche
     var lumiere = new THREE.DirectionalLight(0xffffff, 1.0);
     lumiere.position.set(0, 0, 400);
@@ -1112,7 +1169,6 @@ SphereGame.prototype.init = function () {
     }
 
 };
-
 
 
 SphereGame.prototype.createEnnemies = function () {
@@ -1186,7 +1242,7 @@ SphereGame.prototype.createMunitionTexture = function (texture) {
 
 SphereGame.prototype.cameraZoom = function (value) {
 
-    if (this.camera.position.z < 10000 && !this.ship2) {
+    if (this.scene.camera.position.z < 10000 && !this.ship2) {
         this.scene.followShip = true;
     } else {
         this.scene.followShip = false;
@@ -1194,23 +1250,24 @@ SphereGame.prototype.cameraZoom = function (value) {
 
 
     if (value > 0) {
-        if (this.camera.position.z <= 10000) {
-            if (value + this.camera.position.z > 10000) {
-                this.camera.position.z = 10000;
+        if (this.scene.camera.position.z <= 10000) {
+            if (value + this.scene.camera.position.z > 10000) {
+                this.scene.camera.position.z = 10000;
             } else {
-                this.camera.position.z = value + this.camera.position.z;
+                this.scene.camera.position.z = value + this.scene.camera.position.z;
             }
 
         }
 
     } else {
-        if (this.camera.position.z >= 5000) {
+        if (this.scene.camera.position.z >= 5000) {
 
-            if (value + this.camera.position.z < 5000) {
-                this.camera.position.z = 5000;
+            if (value + this.scene.camera.position.z < 5000) {
+                this.scene.camera.position.z = 5000;
             } else {
-                this.camera.position.z = value + this.camera.position.z;
+                this.scene.camera.position.z = value + this.scene.camera.position.z;
             }
+
         }
     }
 
@@ -1224,7 +1281,7 @@ SphereGame.prototype.tooglePause = function () {
 SphereGame.prototype.initBgm = function () {
 
     this.listener = new THREE.AudioListener();
-    this.camera.add(this.listener);
+    this.scene.camera.add(this.listener);
 
 
     this.bgm1 = new THREE.Audio(this.listener);
@@ -1242,7 +1299,7 @@ SphereGame.prototype.initBgm = function () {
                 self.bgm1.play();
             },
             function (xhr) {
-                console.log(xhr.target.responseURL + ' '+ (xhr.loaded / xhr.total * 100) + '% loaded');
+                console.log(xhr.target.responseURL + ' ' + (xhr.loaded / xhr.total * 100) + '% loaded');
             }
     );
 
