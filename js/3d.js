@@ -1040,8 +1040,13 @@ Ennemi.prototype.destroy = function (ship) {
  * @constructor
  * 
  */
-var SphereGame = function () {
+var SphereGame = function (debug) {
 
+    if (debug) {
+        var stats = new Stats();
+        stats.showPanel(1);
+        document.body.appendChild(stats.dom);
+    }
     this.renderer, this.scene, this.mainSphere = null;
     this.gameDiv = document.getElementById('3d');
 
@@ -1054,9 +1059,16 @@ var SphereGame = function () {
     var self = this;
     this.animate = function () {
 
+        if (debug) {
+            stats.end();
+        }
         // on appel la fonction animate() récursivement à chaque frame
         requestAnimationFrame(self.animate);
 
+//        var time = performance.now() / 1000;
+        if (debug) {
+            stats.begin();
+        }
         if (self.pause) {
             return;
         }
@@ -1099,7 +1111,7 @@ SphereGame.prototype.init = function () {
     };
     this.renderer.setSize(this.size.width, this.size.heigth);
     this.gameDiv.appendChild(this.renderer.domElement);
-    
+
     var self = this;
 
     window.onresize = function (e) {
@@ -1362,8 +1374,8 @@ SphereGame.prototype.initBgm = function () {
 
 SphereGame.prototype.addMouseManager = function () {
 
-    this.ship.sensibilityMouseX = 10;
-    this.ship.sensibilityMouseY = 10;
+    this.ship.sensibilityMouseX = 3;
+    this.ship.sensibilityMouseY = 11;
     this.ship.mouse = {};
     this.ship.mouseIn = false;
     var ship = this.ship;
@@ -1376,6 +1388,33 @@ SphereGame.prototype.addMouseManager = function () {
     document.onmouseleave = function (key) {
         ship.mouseIn = false;
     };
+
+    document.addEventListener("touchstart", function (key) {
+        ship.shooting = true;
+        key.preventDefault();
+        ship.mouseIn = true;
+        ship.mouse.x = ((key.touches[0].pageX / window.innerWidth) * 2 - 1) * 13000 * (ship.sensibilityMouseX / 10);
+        ship.mouse.y = (2 - (key.touches[0].pageY / window.innerHeight) * 2) * 4400 * (ship.sensibilityMouseY / 10);
+
+    }, false);
+
+    document.addEventListener("touchend", function (key) {
+        ship.shooting = false;
+        key.preventDefault();
+        ship.mouseIn = false;
+
+
+    }, false);
+
+    document.addEventListener("touchmove", function (key) {
+        key.preventDefault();
+        ship.mouseIn = true;
+        ship.mouse.x = ((key.touches[0].pageX / window.innerWidth) * 2 - 1) * 13000 * (ship.sensibilityMouseX / 10);
+        ship.mouse.y = (2 - (key.touches[0].pageY / window.innerHeight) * 2) * 4400 * (ship.sensibilityMouseY / 10);
+
+    }, false);
+
+
     document.onmousemove = function (key) {
         ship.mouse.x = ((key.clientX / window.innerWidth) * 2 - 1) * 13000 * (ship.sensibilityMouseX / 10);
         ship.mouse.y = (2 - (key.clientY / window.innerHeight) * 2) * 4400 * (ship.sensibilityMouseY / 10);
@@ -1495,7 +1534,8 @@ SphereGame.prototype.addKeyboardManager = function () {
 
 };
 
-var game = new SphereGame();
+var debug = true;
+var game = new SphereGame(debug);
 
 
 
