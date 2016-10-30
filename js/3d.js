@@ -5,7 +5,7 @@
 //    this.angle += 0.01;
 //};
 
-/* global THREE, document, URL_SHIP_SPHERE, URL_CERISE, URL_FONT,URLS_ENNEMIES, URL_MUNITION */
+/* global THREE, document, URL_SHIP_SPHERE,URL_BIG_STARS, URL_CERISE, URL_FONT,URLS_ENNEMIES, URL_MUNITION */
 
 var Background = function (scene, backgroundColor, starNumber, bigStarsSrc) {
     this.scene = scene;
@@ -484,13 +484,13 @@ var Ship = function (scene, mesh, munition, levelPosition) {
     this.munitionDamage = this.level.level;
 
     this.deplacements = {'up': false, 'down': false, 'left': false, 'right': false};
+    this.mouseShooting = {'rightUp': false, 'leftUp': false};
     this.shooting = false;
     this.munitionSpeed = 150;
     this.munitionSpeedMax = 300;
 
     this.addLifeBar();
-    var event = new Event('shipcreated', [this]);
-    document.dispatchEvent(event);
+
 };
 
 
@@ -591,8 +591,19 @@ Ship.prototype.animateMunition = function () {
 
         var munition = this.munitions[key];
         var deplacements = munition.deplacementOfShipWhenShooting;
+        var mouseShooting = this.mouseShooting;
+
 
         switch (true) {
+            case (mouseShooting.leftUp):
+//                munition.position.y += 50;
+                munition.position.x -= 100;
+                break;
+            case (mouseShooting.rightUp):
+//                munition.position.y += 50;
+                munition.position.x += 100;
+                ;
+                break;
             case (deplacements.left && deplacements.right && deplacements.up && deplacements.down):
                 break;
             case (deplacements.left && deplacements.right):
@@ -682,7 +693,34 @@ Ship.prototype.animateMunition = function () {
 
 Ship.prototype.animateDeplacements = function () {
     var position = this.mesh.position;
+
+
+
+
     var deplacements = this.deplacements;
+
+
+    if (this.mouseIn) {
+        deplacements.left = false;
+        deplacements.right = false;
+        deplacements.up = false;
+        deplacements.down = false;
+        if (((this.mouse.x - this.position.x < this.mesh.geometry.toJSON().radius / 2) && (this.mouse.x * -1) < 0) || ((this.mouse.x - this.position.x < -this.mesh.geometry.toJSON().radius / 2) && (this.mouse.x * -1) > 0)) {
+            deplacements.left = true;
+        }
+
+        if (((this.mouse.x - this.position.x > -this.mesh.geometry.toJSON().radius / 2) && (this.mouse.x * -1) < 0) || ((this.mouse.x - this.position.x > this.mesh.geometry.toJSON().radius / 2) && (this.mouse.x * -1) > 0)) {
+            deplacements.right = true;
+        }
+        if (((this.mouse.y - this.position.y < this.mesh.geometry.toJSON().radius / 2) && (this.mouse.y * -1) < 0) || ((this.mouse.y - this.position.y < -this.mesh.geometry.toJSON().radius / 2) && (this.mouse.y * -1) > 0)) {
+            deplacements.down = true;
+        }
+
+        if (((this.mouse.y - this.position.y > -this.mesh.geometry.toJSON().radius / 2) && (this.mouse.y * -1) < 0) || ((this.mouse.y - this.position.y > this.mesh.geometry.toJSON().radius / 2) && (this.mouse.y * -1) > 0)) {
+            deplacements.up = true;
+        }
+    }
+
 
     switch (true) {
         case (deplacements.left && deplacements.right && deplacements.up && deplacements.down):
@@ -1042,7 +1080,9 @@ var SphereGame = function () {
 
 
     this.init();
-    this.addKeyboardManager();
+//    this.addKeyboardManager();
+//    this.addMouseManager();
+
 
     this.animate();
 };
@@ -1132,14 +1172,16 @@ SphereGame.prototype.init = function () {
 
     if (document.attachEvent) {
 
-        document.attachEvent("shipcreated", function (e, er) {
-            console.log(e);
+        document.attachEvent("shipcreated", function (e, ship) {
+//            self.addKeyboardManager();
+            self.addMouseManager();
         });
 
     } else if (document.addEventListener) {
 
         document.addEventListener("shipcreated", function (e, er) {
-            console.log(er);
+            //    self.addKeyboardManager();
+            self.addMouseManager();
         }, false);
 
     }
@@ -1217,8 +1259,9 @@ SphereGame.prototype.createShip = function (texture) {
                 function (textureMun) {
 
                     self.createMunitionTexture(textureMun);
-                    console.log(self.munitionShip);
                     self.ship = new Ship(self.scene, new THREE.Mesh(self.geometryShip, self.materialShip), self.munitionShip, 'left');
+                    var event = new Event('shipcreated', [this.ship]);
+                    document.dispatchEvent(event);
                 },
                 function (xhr) {
                     console.log(xhr.target.responseURL + ' ' + (xhr.loaded / xhr.total * 100) + '% loaded');
@@ -1226,6 +1269,8 @@ SphereGame.prototype.createShip = function (texture) {
         );
     } else {
         this.ship = new Ship(this.scene, new THREE.Mesh(this.geometryShip, this.materialShip), this.munitionShip, 'left');
+        var event = new Event('shipcreated', [this.ship]);
+        document.dispatchEvent(event);
     }
 
     this.playersNumbers++;
@@ -1305,6 +1350,34 @@ SphereGame.prototype.initBgm = function () {
 
 };
 
+SphereGame.prototype.addMouseManager = function () {
+
+    this.ship.sensibilityMouseX = 10;
+    this.ship.sensibilityMouseY = 10;
+    this.ship.mouse = {};
+    this.ship.mouseIn = false;
+    var ship = this.ship;
+
+    document.onmouseenter = function (key) {
+        ship.mouseIn = true;
+        ship.mouse.x = ((key.clientX / window.innerWidth) * 2 - 1) * 13000 * (ship.sensibilityMouseX / 10);
+        ship.mouse.y = (2 - (key.clientY / window.innerHeight) * 2) * 4400 * (ship.sensibilityMouseY / 10);
+    };
+    document.onmouseleave = function (key) {
+        ship.mouseIn = false;
+    };
+    document.onmousemove = function (key) {
+        ship.mouse.x = ((key.clientX / window.innerWidth) * 2 - 1) * 13000 * (ship.sensibilityMouseX / 10);
+        ship.mouse.y = (2 - (key.clientY / window.innerHeight) * 2) * 4400 * (ship.sensibilityMouseY / 10);
+    };
+    this.gameDiv.onmousedown = function (key) {
+        ship.shooting = true;
+    };
+    this.gameDiv.onmouseup = function (key) {
+        ship.shooting = false;
+    };
+};
+
 SphereGame.prototype.addKeyboardManager = function () {
     var self = this;
 
@@ -1359,6 +1432,7 @@ SphereGame.prototype.addKeyboardManager = function () {
     };
 
     document.onkeydown = function (key) {
+        self.ship.mouseIn = false;
         switch (key.keyCode) {
             case 32:
                 self.ship.shooting = true;
