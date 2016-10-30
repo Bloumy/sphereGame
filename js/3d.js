@@ -1099,6 +1099,16 @@ SphereGame.prototype.init = function () {
     };
     this.renderer.setSize(this.size.width, this.size.heigth);
     this.gameDiv.appendChild(this.renderer.domElement);
+    
+    var self = this;
+
+    window.onresize = function (e) {
+        self.renderer.setSize(this.innerWidth, this.innerHeight);
+        self.scene.camera.aspect = this.innerWidth / this.innerHeight;
+        self.scene.camera.updateProjectionMatrix();
+    };
+
+
 
     // on initialise la scène
     this.scene = new THREE.Scene();
