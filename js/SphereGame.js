@@ -26,7 +26,7 @@ var SphereGame = function (debug, textureMaterialUrls) {
 
 
 
-    var self = this;
+
     this.animate = function () {
 
         if (debug) {
@@ -34,33 +34,32 @@ var SphereGame = function (debug, textureMaterialUrls) {
         }
 
         // on appel la fonction animate() récursivement à chaque frame
-        requestAnimationFrame(self.animate);
+        requestAnimationFrame(this.animate);
 
 //        var time = performance.now() / 1000;
         if (debug) {
             stats.begin();
         }
-        if (self.pause) {
+
+        if (this.pause) {
             return;
         }
 
-        self.background.animate();
+        this.background.animate();
 
 
-        for (var i in self.scene.playerShips) {
-            self.scene.playerShips[i].animate();
+        for (var i in this.scene.playerShips) {
+            this.scene.playerShips[i].animate();
         }
 
-        for (var i in self.scene.ennemies) {
-            self.scene.ennemies[i].animate();
+        for (var i in this.scene.ennemies) {
+            this.scene.ennemies[i].animate();
         }
 
 
         // on effectue le rendu de la scène
-        self.renderer.render(self.scene, self.scene.camera);
-    };
-
-
+        this.renderer.render(this.scene, this.scene.camera);
+    }.bind(this);
 
     this.init();
 
@@ -77,25 +76,26 @@ SphereGame.prototype.init = function () {
         width: window.innerWidth,
         heigth: window.innerHeight
     };
+
     this.renderer.setSize(this.size.width, this.size.heigth);
     this.gameDiv.appendChild(this.renderer.domElement);
 
-    var self = this;
 
     window.onresize = function (e) {
-        self.renderer.setSize(this.innerWidth, this.innerHeight);
-        self.scene.camera.aspect = this.innerWidth / this.innerHeight;
-        self.scene.camera.updateProjectionMatrix();
-    };
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.scene.camera.aspect = window.innerWidth / window.innerHeight;
+        this.scene.camera.updateProjectionMatrix();
+    }.bind(this);
 
 
 
     // on initialise la scène
     this.scene = new THREE.Scene();
 
+    var initialCameraPosition = {x: 0, y: 4000, z: 10000};
+    this.scene.initialCameraPosition = initialCameraPosition;
 
-    this.scene.initialCameraPosition = {x: 0, y: 4000, z: 10000};
-    this.scene.gameBoundLimit = {
+    var gameBoundLimit = {
         'minX': -3200,
         'maxX': 3200,
         'minY': -400,
@@ -103,6 +103,7 @@ SphereGame.prototype.init = function () {
         'minZ': 0,
         'maxZ': 0
     };
+    this.scene.gameBoundLimit = gameBoundLimit;
 
     // on initialise la camera que l’on place ensuite sur la scène
     this.scene.camera = new THREE.PerspectiveCamera(50, this.size.width / this.size.heigth, 1, 50000);
@@ -120,28 +121,28 @@ SphereGame.prototype.init = function () {
 
     this.scene.followShip = false;
 
-    var self = this;
+
 
     var mousewheelevt = (/Firefox/i.test(navigator.userAgent)) ? "DOMMouseScroll" : "mousewheel" //FF doesn't recognize mousewheel as of FF3.x
     if (document.attachEvent) {
 
         document.attachEvent("on" + mousewheelevt, function (e) {
-            if (self.pause) {
+            if (this.pause) {
                 return;
             }
             var delta = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)));
-            self.cameraZoom(delta * -100);
-        });
+            this.cameraZoom(delta * -100);
+        }.bind(this));
 
     } else if (document.addEventListener) {
 
         document.addEventListener(mousewheelevt, function (e) {
-            if (self.pause) {
+            if (this.pause) {
                 return;
             }
             var delta = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)));
-            self.cameraZoom(delta * -100);
-        }, false);
+            this.cameraZoom(delta * -100);
+        }.bind(this), false);
 
     }
 
@@ -158,26 +159,27 @@ SphereGame.prototype.init = function () {
     this.textureLoader.load(
             this.srcMainSphereMaterial,
             function (texture) {
-                self.createShip(texture);
-            },
+                this.createShip(texture);
+            }.bind(this),
             function (xhr) {
                 console.log(xhr.target.responseURL + ' ' + (xhr.loaded / xhr.total * 100) + '% loaded');
             }
     );
 
     if (document.attachEvent) {
-
-        document.attachEvent("shipcreated", function (e, ship) {
-//            self.addKeyboardManager();
-            self.addMouseManager();
-        });
+        document.attachEvent("shipcreated", function (e) {
+            this.playerShip1 = e.detail.ship;
+            this.addKeyboardManager();
+//            self.addMouseManager();
+        }.bind(this));
 
     } else if (document.addEventListener) {
 
-        document.addEventListener("shipcreated", function (e, er) {
-            //    self.addKeyboardManager();
-            self.addMouseManager();
-        }, false);
+        document.addEventListener("shipcreated", function (e) {
+            this.playerShip1 = e.detail.ship;
+            this.addKeyboardManager();
+//            self.addMouseManager();
+        }.bind(this), false);
 
     }
 
@@ -193,16 +195,16 @@ SphereGame.prototype.init = function () {
                 this.srcEnnemiesMaterial[i],
                 function (texture) {
                     texture.minFilter = THREE.LinearFilter;
-                    self.ennemiesMaterials.push(new THREE.MeshBasicMaterial({map: texture}));
+                    this.ennemiesMaterials.push(new THREE.MeshBasicMaterial({map: texture}));
 
-                    if (self.srcEnnemiesMaterial.length === self.ennemiesMaterials.length) {
-                        self.createEnnemies();
+                    if (this.srcEnnemiesMaterial.length === this.ennemiesMaterials.length) {
+                        this.createEnnemies();
                     }
-                },
+                }.bind(this),
                 function (xhr) {
                     console.log(xhr.target.responseURL + ' ' + (xhr.loaded / xhr.total * 100) + '% loaded');
-                }
-        );
+                }.bind(this)
+                );
     }
 
 };
@@ -240,6 +242,7 @@ SphereGame.prototype.createEnnemies = function () {
 };
 
 SphereGame.prototype.createShip = function (texture) {
+    var ship = null;
     texture.minFilter = THREE.LinearFilter;
     this.geometryShip = new THREE.SphereGeometry(200, 32, 32);
     this.materialShip = new THREE.MeshBasicMaterial({
@@ -247,28 +250,27 @@ SphereGame.prototype.createShip = function (texture) {
     });
 
     if (!this.munitionShip) {
-        var self = this;
         // créer les munitions 
         this.textureLoader.load(
                 this.srcMunitionMaterial,
                 function (textureMun) {
 
-                    self.createMunitionTexture(textureMun);
-                    self.playerShip1 = new PlayerShip(self.scene, new THREE.Mesh(self.geometryShip, self.materialShip), {'levelPosition': 'left', 'popPosition': null, 'munitionModele': self.munitionShip});
-                    var event = new Event('shipcreated', [this.ship]);
+                    this.createMunitionTexture(textureMun);
+                    ship = new PlayerShip(this.scene, new THREE.Mesh(this.geometryShip, this.materialShip), {'levelPosition': 'left', 'popPosition': null, 'munitionModele': this.munitionShip});
+                    var event = new CustomEvent('shipcreated', {'detail':{'ship': ship}});
                     document.dispatchEvent(event);
-                },
+                }.bind(this),
                 function (xhr) {
                     console.log(xhr.target.responseURL + ' ' + (xhr.loaded / xhr.total * 100) + '% loaded');
-                }
-        );
+                }.bind(this)
+                );
     } else {
-        this.playerShip1 = new PlayerShip(self.scene, new THREE.Mesh(self.geometryShip, self.materialShip), {'levelPosition': 'left', 'popPosition': null, 'munitionModele': self.munitionShip})
-        var event = new Event('shipcreated', [this.playerShip1]);
+        ship = new PlayerShip(this.scene, new THREE.Mesh(this.geometryShip, this.materialShip), {'levelPosition': 'left', 'popPosition': null, 'munitionModele': this.munitionShip});
+        var event = new CustomEvent('shipcreated', {'detail':{'ship': ship}});
         document.dispatchEvent(event);
     }
 
-    this.playersNumbers++;
+//    this.playersNumbers++;
 };
 
 SphereGame.prototype.createMunitionTexture = function (texture) {
@@ -353,7 +355,7 @@ SphereGame.prototype.addMouseManager = function () {
     playerShip1.mouse = {};
     playerShip1.mouseIn = false;
 
-    
+
 
     document.onmouseenter = function (key) {
         playerShip1.mouseIn = true;
@@ -400,30 +402,26 @@ SphereGame.prototype.addMouseManager = function () {
 };
 
 SphereGame.prototype.addKeyboardManager = function () {
-    var self = this;
-
-    var shipPlayer1 = this.playerShip1.ship;
-
 
     document.onkeyup = function (key) {
         switch (key.keyCode) {
             case  27:
-                self.tooglePause();
+                this.tooglePause();
                 break;
             case  32:
-                shipPlayer1.shooting = false;
+                this.playerShip1.shooting = false;
                 break;
             case  37:
-                shipPlayer1.deplacements.left = false;
+                this.playerShip1.deplacements.left = false;
                 break;
             case  38:
-                shipPlayer1.deplacements.up = false;
+                this.playerShip1.deplacements.up = false;
                 break;
             case  39:
-                shipPlayer1.deplacements.right = false;
+                this.playerShip1.deplacements.right = false;
                 break;
             case  40:
-                shipPlayer1.deplacements.down = false;
+                this.playerShip1.deplacements.down = false;
                 break;
 
 //            case  17:
@@ -453,25 +451,25 @@ SphereGame.prototype.addKeyboardManager = function () {
 //                break;
 //
         }
-    };
+    }.bind(this);
 
     document.onkeydown = function (key) {
-        this.scene.ships[0].mouseIn = false;
+        this.playerShip1.mouseIn = false;
         switch (key.keyCode) {
             case 32:
-                shipPlayer1.shooting = true;
+                this.playerShip1.shooting = true;
                 break;
             case  37:
-                shipPlayer1.deplacements.left = true;
+                this.playerShip1.deplacements.left = true;
                 break;
             case  38:
-                shipPlayer1.deplacements.up = true;
+                this.playerShip1.deplacements.up = true;
                 break;
             case  39:
-                shipPlayer1.deplacements.right = true;
+                this.playerShip1.deplacements.right = true;
                 break;
             case  40:
-                shipPlayer1.deplacements.down = true;
+                this.playerShip1.deplacements.down = true;
                 break;
 
 //            case  17:
@@ -505,7 +503,7 @@ SphereGame.prototype.addKeyboardManager = function () {
 //                }
 //                break;
         }
-    };
+    }.bind(this);
 
 };
 

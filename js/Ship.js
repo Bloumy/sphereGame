@@ -207,16 +207,17 @@ Ship.prototype.animateMunition = function () {
         }
 
         for (var i in this.scene.ennemies) {
+       
             var ennemi = this.scene.ennemies[i];
             // si l'ennemi est aux meme coordonnées que ma munition
             if (ennemi.ship.isAtSamePositionThan(munition.position)) {
 
                 this.destroyMunition(key);
 
-                ennemi.hp -= this.munitionDamage;
+                ennemi.ship.hp -= this.munitionDamage;
 
-                if (ennemi.hp < this.munitionDamage) {
-                    ennemi.destroy(this);
+                if (ennemi.ship.hp < this.munitionDamage) {
+                    ennemi.ship.destroy(this);
                 }
             }
 
@@ -284,29 +285,29 @@ Ship.prototype.animateDeplacements = function () {
     var position = this.mesh.position;
     var deplacements = this.deplacements;
 
-    var isShipDeplacementEnded = this.mouse.x !== position.x || this.mouse.y !== position.y;
-
-
-    if ((this.mouseIn || isShipDeplacementEnded) && !this.isInCOllision) {
-        deplacements.left = false;
-        deplacements.right = false;
-        deplacements.up = false;
-        deplacements.down = false;
-        if (((this.mouse.x - position.x < this.mesh.geometry.toJSON().radius / 2) && (this.mouse.x * -1) < 0) || ((this.mouse.x - position.x < -this.mesh.geometry.toJSON().radius / 2) && (this.mouse.x * -1) > 0)) {
-            deplacements.left = true;
-        }
-
-        if (((this.mouse.x - position.x > -this.mesh.geometry.toJSON().radius / 2) && (this.mouse.x * -1) < 0) || ((this.mouse.x - position.x > this.mesh.geometry.toJSON().radius / 2) && (this.mouse.x * -1) > 0)) {
-            deplacements.right = true;
-        }
-        if (((this.mouse.y - position.y < this.mesh.geometry.toJSON().radius / 2) && (this.mouse.y * -1) < 0) || ((this.mouse.y - position.y < -this.mesh.geometry.toJSON().radius / 2) && (this.mouse.y * -1) > 0)) {
-            deplacements.down = true;
-        }
-
-        if (((this.mouse.y - position.y > -this.mesh.geometry.toJSON().radius / 2) && (this.mouse.y * -1) < 0) || ((this.mouse.y - position.y > this.mesh.geometry.toJSON().radius / 2) && (this.mouse.y * -1) > 0)) {
-            deplacements.up = true;
-        }
-    }
+//    var isShipDeplacementEnded = this.mouse.x !== position.x || this.mouse.y !== position.y;
+//
+//
+//    if ((this.mouseIn || isShipDeplacementEnded) && !this.isInCOllision) {
+//        deplacements.left = false;
+//        deplacements.right = false;
+//        deplacements.up = false;
+//        deplacements.down = false;
+//        if (((this.mouse.x - position.x < this.mesh.geometry.toJSON().radius / 2) && (this.mouse.x * -1) < 0) || ((this.mouse.x - position.x < -this.mesh.geometry.toJSON().radius / 2) && (this.mouse.x * -1) > 0)) {
+//            deplacements.left = true;
+//        }
+//
+//        if (((this.mouse.x - position.x > -this.mesh.geometry.toJSON().radius / 2) && (this.mouse.x * -1) < 0) || ((this.mouse.x - position.x > this.mesh.geometry.toJSON().radius / 2) && (this.mouse.x * -1) > 0)) {
+//            deplacements.right = true;
+//        }
+//        if (((this.mouse.y - position.y < this.mesh.geometry.toJSON().radius / 2) && (this.mouse.y * -1) < 0) || ((this.mouse.y - position.y < -this.mesh.geometry.toJSON().radius / 2) && (this.mouse.y * -1) > 0)) {
+//            deplacements.down = true;
+//        }
+//
+//        if (((this.mouse.y - position.y > -this.mesh.geometry.toJSON().radius / 2) && (this.mouse.y * -1) < 0) || ((this.mouse.y - position.y > this.mesh.geometry.toJSON().radius / 2) && (this.mouse.y * -1) > 0)) {
+//            deplacements.up = true;
+//        }
+//    }
 
 
     switch (true) {
